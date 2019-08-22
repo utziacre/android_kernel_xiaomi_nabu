@@ -1,0 +1,24 @@
+# Xiaomi configuration options
+
+config MACH_XIAOMI
+	bool "Xiaomi device"
+	depends on ARCH_QCOM
+	help
+	  Support for Xiaomi products
+
+config MACH_XIAOMI_SM8150
+	bool "Xiaomi SM8150"
+	depends on ARCH_QCOM
+	select MACH_XIAOMI
+	help
+	  Support for Xiaomi SM8150 devices
+
+menu "Xiaomi board selection"
+
+config MACH_XIAOMI_NABU
+        bool "vayu board"
+        select MACH_XIAOMI_SM8150
+        help
+          Support for Xiaomi Pad 5
+
+endmenu
