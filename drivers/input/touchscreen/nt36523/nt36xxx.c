@@ -1659,6 +1659,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	uint32_t pen_btn2 = 0;
 	uint32_t pen_battery = 0;
 
+	pm_qos_update_request(&ts->pm_qos_req, 100);
+
 #if WAKEUP_GESTURE
 	if (bTouchIsAwake == 0) {
 		pm_wakeup_event(&ts->input_dev->dev, 5000);
@@ -1733,8 +1735,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		NVT_LOG("Enter WAKEUP_GESTURE\n");
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
-		mutex_unlock(&ts->lock);
-		return IRQ_HANDLED;
+		goto XFER_ERROR;
 	}
 #endif
 
@@ -1891,7 +1892,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	} /* if (ts->pen_support) */
 
 XFER_ERROR:
-
+	pm_qos_update_request(&ts->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	mutex_unlock(&ts->lock);
 	return IRQ_HANDLED;
 }
@@ -2963,6 +2964,9 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 			nvt_irq_enable(false);
 			NVT_LOG("request irq %d succeed\n", client->irq);
 		}
+
+		pm_qos_add_request(&ts->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
 	}
 
 	INIT_WORK(&ts->switch_mode_work, nvt_switch_mode_work);
@@ -3274,6 +3278,8 @@ static int32_t nvt_ts_remove(struct spi_device *client)
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 	unregister_early_suspend(&ts->early_suspend);
 #endif
+
+	pm_qos_remove_request(&ts->pm_qos_req);
 
 if (pen_charge_state_notifier_unregister_client(&ts->pen_charge_state_notifier))
 		NVT_ERR("Error occurred while unregistering pen charge state notifier.\n");
