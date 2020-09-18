@@ -2115,6 +2115,7 @@ static void binder_free_transaction(struct binder_transaction *t)
 		 */
 		spin_unlock(&t->lock);
 	}
+
 	kfree(t);
 	binder_stats_deleted(BINDER_STAT_TRANSACTION);
 }
