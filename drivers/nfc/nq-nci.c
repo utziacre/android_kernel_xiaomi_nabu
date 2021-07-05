@@ -1618,8 +1618,15 @@ static int nfcc_reboot(struct notifier_block *notifier, unsigned long val,
 /*
  * module load/unload record keeping
  */
+#ifdef CONFIG_MACH_XIAOMI_NABU
+extern char *saved_command_line;
+#endif
 static int __init nqx_dev_init(void)
 {
+#ifdef CONFIG_MACH_XIAOMI_NABU
+	if (strstr(saved_command_line, "androidboot.product.hardware.sku=bhima"))
+		return -1;
+#endif
 	return i2c_add_driver(&nqx);
 }
 module_init(nqx_dev_init);
