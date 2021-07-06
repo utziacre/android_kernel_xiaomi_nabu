@@ -25,6 +25,9 @@
 #define UFS_VENDOR_SAMSUNG     0x1CE
 #define UFS_VENDOR_SKHYNIX     0x1AD
 #define UFS_VENDOR_WDC		0x145
+#ifdef CONFIG_MACH_XIAOMI_NABU
+#define UFS_VENDOR_SANDISK     0x0145
+#endif
 
 /**
  * ufs_dev_fix - ufs device quirk info
