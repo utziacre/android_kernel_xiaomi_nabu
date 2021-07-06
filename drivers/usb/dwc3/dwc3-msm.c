@@ -4894,8 +4894,10 @@ static int dwc3_msm_gadget_vbus_draw(struct dwc3_msm *mdwc, unsigned int mA)
 		 * bail out if suspend happened with float cable
 		 * connected
 		 */
+#ifndef CONFIG_MACH_XIAOMI_NABU
 		if (mA == 2)
 			return 0;
+#endif
 
 		if (!mA)
 			pval.intval = -ETIMEDOUT;
