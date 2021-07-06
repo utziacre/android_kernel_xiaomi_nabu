@@ -24,6 +24,9 @@
 static struct list_head backlight_dev_list;
 static struct mutex backlight_dev_list_mutex;
 static struct blocking_notifier_head backlight_notifier;
+#ifdef CONFIG_MACH_XIAOMI_SM8150
+static int bl_event;
+#endif
 
 static const char *const backlight_types[] = {
 	[BACKLIGHT_RAW] = "raw",
@@ -119,6 +122,9 @@ static void backlight_generate_event(struct backlight_device *bd,
 	envp[1] = NULL;
 	kobject_uevent_env(&bd->dev.kobj, KOBJ_CHANGE, envp);
 	sysfs_notify(&bd->dev.kobj, NULL, "actual_brightness");
+#ifdef CONFIG_MACH_XIAOMI_SM8150
+	sysfs_notify(&bd->dev.kobj, NULL, "brightness");
+#endif
 }
 
 static ssize_t bl_power_show(struct device *dev, struct device_attribute *attr,
@@ -180,7 +186,25 @@ int backlight_device_set_brightness(struct backlight_device *bd,
 		if (brightness > bd->props.max_brightness)
 			rc = -EINVAL;
 		else {
+#ifdef CONFIG_MACH_XIAOMI_SM8150
+			if ((!bd->use_count && brightness) || (bd->use_count && !brightness)) {
+				pr_info("%s: set brightness to %lu\n", __func__, brightness);
+				if (!bd->use_count)
+					bd->use_count++;
+				else
+					bd->use_count--;
+			}
+#endif
 			pr_debug("set brightness to %lu\n", brightness);
+#ifdef CONFIG_MACH_XIAOMI_SM8150
+			if (!brightness) {
+				bl_event = BACKLIGHT_OFF;
+				blocking_notifier_call_chain(&backlight_notifier, BACKLIGHT_UPDATED, &bl_event);
+			} else if (bl_event != BACKLIGHT_ON) {
+				bl_event = BACKLIGHT_ON;
+				blocking_notifier_call_chain(&backlight_notifier, BACKLIGHT_UPDATED, &bl_event);
+			}
+#endif
 			bd->props.brightness = brightness;
 			rc = backlight_update_status(bd);
 		}
@@ -291,12 +315,49 @@ static void bl_device_release(struct device *dev)
 	kfree(bd);
 }
 
+#ifdef CONFIG_MACH_XIAOMI_SM8150
+static ssize_t brightness_clone_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct backlight_device *bd = to_backlight_device(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", bd->props.brightness_clone);
+}
+
+static ssize_t brightness_clone_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int rc;
+	struct backlight_device *bd = to_backlight_device(dev);
+	unsigned long brightness;
+	char *envp[2];
+
+	rc = kstrtoul(buf, 0, &brightness);
+	if (rc)
+		return rc;
+
+	bd->props.brightness_clone = brightness;
+
+	envp[0] = "SOURCE=sysfs";
+	envp[1] = NULL;
+	kobject_uevent_env(&bd->dev.kobj, KOBJ_CHANGE, envp);
+	sysfs_notify(&bd->dev.kobj, NULL, "brightness_clone");
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(brightness_clone);
+#endif
+
 static struct attribute *bl_device_attrs[] = {
 	&dev_attr_bl_power.attr,
 	&dev_attr_brightness.attr,
 	&dev_attr_actual_brightness.attr,
 	&dev_attr_max_brightness.attr,
 	&dev_attr_type.attr,
+#ifdef CONFIG_MACH_XIAOMI_SM8150
+	&dev_attr_brightness_clone.attr,
+#endif
 	NULL,
 };
 ATTRIBUTE_GROUPS(bl_device);
