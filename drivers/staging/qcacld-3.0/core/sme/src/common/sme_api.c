@@ -14689,7 +14689,7 @@ uint32_t sme_get_wni_dot11_mode(tHalHandle hal)
 }
 
 QDF_STATUS sme_create_mon_session(tHalHandle hal_handle,
-				  tSirMacAddr bss_id, uint8_t vdev_id)
+				  uint8_t *bss_id, uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct sir_create_session *msg;
