@@ -1860,7 +1860,7 @@ static int dsi_ctrl_dev_probe(struct platform_device *pdev)
 	dsi_ctrl->irq_info.irq_num = -1;
 	dsi_ctrl->irq_info.irq_stat_mask = 0x0;
 
-	spin_lock_init(&dsi_ctrl->irq_info.irq_lock);
+	raw_spin_lock_init(&dsi_ctrl->irq_info.irq_lock);
 
 	rc = dsi_ctrl_dts_parse(dsi_ctrl, pdev->dev.of_node);
 	if (rc) {
@@ -2571,9 +2571,9 @@ static irqreturn_t dsi_ctrl_isr(int irq, void *ptr)
 
 	for (i = 0; status && i < DSI_STATUS_INTERRUPT_COUNT; ++i) {
 		if (status & 0x1) {
-			spin_lock_irqsave(&dsi_ctrl->irq_info.irq_lock, flags);
+			raw_spin_lock_irqsave(&dsi_ctrl->irq_info.irq_lock, flags);
 			cb_info = dsi_ctrl->irq_info.irq_stat_cb[i];
-			spin_unlock_irqrestore(
+			raw_spin_unlock_irqrestore(
 					&dsi_ctrl->irq_info.irq_lock, flags);
 
 			if (cb_info.event_cb)
@@ -2614,7 +2614,8 @@ static int _dsi_ctrl_setup_isr(struct dsi_ctrl *dsi_ctrl)
 		rc = irq_num;
 	} else {
 		rc = devm_request_threaded_irq(&dsi_ctrl->pdev->dev, irq_num,
-				dsi_ctrl_isr, NULL, 0, "dsi_ctrl", dsi_ctrl);
+				dsi_ctrl_isr, NULL, IRQF_NO_THREAD, "dsi_ctrl",
+				dsi_ctrl);
 		if (rc) {
 			pr_err("[DSI_%d] Failed to request IRQ, %d\n",
 					dsi_ctrl->cell_index, rc);
@@ -2654,7 +2655,7 @@ void dsi_ctrl_enable_status_interrupt(struct dsi_ctrl *dsi_ctrl,
 			intr_idx >= DSI_STATUS_INTERRUPT_COUNT)
 		return;
 
-	spin_lock_irqsave(&dsi_ctrl->irq_info.irq_lock, flags);
+	raw_spin_lock_irqsave(&dsi_ctrl->irq_info.irq_lock, flags);
 
 	if (dsi_ctrl->irq_info.irq_stat_refcount[intr_idx] == 0) {
 		/* enable irq on first request */
@@ -2671,7 +2672,7 @@ void dsi_ctrl_enable_status_interrupt(struct dsi_ctrl *dsi_ctrl,
 	if (event_info)
 		dsi_ctrl->irq_info.irq_stat_cb[intr_idx] = *event_info;
 
-	spin_unlock_irqrestore(&dsi_ctrl->irq_info.irq_lock, flags);
+	raw_spin_unlock_irqrestore(&dsi_ctrl->irq_info.irq_lock, flags);
 }
 
 void dsi_ctrl_disable_status_interrupt(struct dsi_ctrl *dsi_ctrl,
@@ -2682,7 +2683,7 @@ void dsi_ctrl_disable_status_interrupt(struct dsi_ctrl *dsi_ctrl,
 	if (!dsi_ctrl || intr_idx >= DSI_STATUS_INTERRUPT_COUNT)
 		return;
 
-	spin_lock_irqsave(&dsi_ctrl->irq_info.irq_lock, flags);
+	raw_spin_lock_irqsave(&dsi_ctrl->irq_info.irq_lock, flags);
 
 	if (dsi_ctrl->irq_info.irq_stat_refcount[intr_idx])
 		if (--(dsi_ctrl->irq_info.irq_stat_refcount[intr_idx]) == 0) {
@@ -2696,7 +2697,7 @@ void dsi_ctrl_disable_status_interrupt(struct dsi_ctrl *dsi_ctrl,
 				disable_irq_nosync(dsi_ctrl->irq_info.irq_num);
 		}
 
-	spin_unlock_irqrestore(&dsi_ctrl->irq_info.irq_lock, flags);
+	raw_spin_unlock_irqrestore(&dsi_ctrl->irq_info.irq_lock, flags);
 }
 
 int dsi_ctrl_host_timing_update(struct dsi_ctrl *dsi_ctrl)
