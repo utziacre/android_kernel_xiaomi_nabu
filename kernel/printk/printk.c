@@ -1750,7 +1750,7 @@ static void call_console_drivers(const char *ext_text, size_t ext_len,
 	if (!console_drivers)
 		return;
 
-	if (IS_ENABLED(CONFIG_PREEMPT_RT_BASE)) {
+	if (IS_ENABLED(CONFIG_PREEMPT_RT_BASE) && !oops_in_progress) {
 		if (in_irq() || in_nmi())
 			return;
 	}
@@ -2511,11 +2511,6 @@ void console_unblank(void)
 {
 	struct console *c;
 
-	if (IS_ENABLED(CONFIG_PREEMPT_RT_BASE)) {
-		if (in_irq() || in_nmi())
-			return;
-	}
-
 	/*
 	 * console_unblank can no longer be called in interrupt context unless
 	 * oops_in_progress is set to 1..
@@ -2523,8 +2518,13 @@ void console_unblank(void)
 	if (oops_in_progress) {
 		if (down_trylock_console_sem() != 0)
 			return;
-	} else
+	} else {
+		if (IS_ENABLED(CONFIG_PREEMPT_RT_BASE)) {
+			if (in_irq() || in_nmi())
+				return;
+		}
 		console_lock();
+	}
 
 	console_locked = 1;
 	console_may_schedule = 0;
