@@ -773,13 +773,13 @@ And public attribution of xiaomi platforms(like J20S and so and)
 		novatek,config-array-size = <2>;
 		novatek,cfg_0 {
 			novatek,display-maker = <0x42>;
-			novatek,fw-name = "novatek_nt36523_fw01.bin";
-			novatek,mp-name = "novatek_nt36523_mp01.bin";
+			novatek,fw-name = "novatek_nt36523_k82_fw01.bin";
+			novatek,mp-name = "novatek_nt36523_k82_mp01.bin";
 		};
 		novatek,cfg_1 {
 			novatek,display-maker = <0x36>;
-			novatek,fw-name = "novatek_nt36523_fw02.bin";
-			novatek,mp-name = "novatek_nt36523_mp02.bin";
+			novatek,fw-name = "novatek_nt36523_k82_fw02.bin";
+			novatek,mp-name = "novatek_nt36523_k82_mp02.bin";
 		};
 
 	};
