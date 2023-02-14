@@ -26,9 +26,14 @@
 #include <dsp/q6common.h>
 #include <dsp/q6core.h>
 #include <dsp/msm-audio-event-notify.h>
+#include <dsp/apr_elliptic.h>
 #include <ipc/apr_tal.h>
 #include "adsp_err.h"
 #include "q6afecal-hwdep.h"
+
+#ifdef CONFIG_MSM_CSPL
+#include <dsp/msm-cirrus-playback.h>
+#endif
 
 #define WAKELOCK_TIMEOUT	5000
 enum {
@@ -354,11 +359,6 @@ static int32_t sp_make_afe_callback(uint32_t opcode, uint32_t *payload,
 	/* Set command specific details */
 	switch (opcode) {
 	case AFE_PORT_CMDRSP_GET_PARAM_V2:
-		if (payload_size < (5 * sizeof(uint32_t))) {
-			pr_err("%s: Error: size %d is less than expected\n",
-				__func__, payload_size);
-			return -EINVAL;
-		}
 		expected_size += sizeof(struct param_hdr_v1);
 		param_hdr.module_id = payload[1];
 		param_hdr.instance_id = INSTANCE_ID_0;
@@ -367,11 +367,6 @@ static int32_t sp_make_afe_callback(uint32_t opcode, uint32_t *payload,
 		data_start = &payload[4];
 		break;
 	case AFE_PORT_CMDRSP_GET_PARAM_V3:
-		if (payload_size < (6 * sizeof(uint32_t))) {
-			pr_err("%s: Error: size %d is less than expected\n",
-				__func__, payload_size);
-			return -EINVAL;
-		}
 		expected_size += sizeof(struct param_hdr_v3);
 		memcpy(&param_hdr, &payload[1], sizeof(struct param_hdr_v3));
 		data_start = &payload[5];
@@ -561,8 +556,14 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 	    data->opcode == AFE_PORT_CMDRSP_GET_PARAM_V3) {
 		uint32_t *payload = data->payload;
 		uint32_t param_id;
-		uint32_t param_id_pos = 0;
 
+#ifdef CONFIG_MSM_CSPL
+        if (crus_afe_callback(data->opcode, data->payload, data->payload_size) == 0){
+            if (afe_token_is_valid(data->token))
+                wake_up(&this_afe.wait[data->token]);
+            return 0;
+        }
+#endif
 		if (!payload || (data->token >= AFE_MAX_PORTS)) {
 			pr_err("%s: Error: size %d payload %pK token %d\n",
 				__func__, data->payload_size,
@@ -574,18 +575,9 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 					   data->payload_size))
 			return 0;
 
-		if (data->opcode == AFE_PORT_CMDRSP_GET_PARAM_V3)
-			param_id_pos = 4;
-		else
-			param_id_pos = 3;
-
-		if (data->payload_size >= param_id_pos * sizeof(uint32_t))
-				param_id = payload[param_id_pos - 1];
-		else {
-			pr_err("%s: Error: size %d is less than expected\n",
-				__func__, data->payload_size);
-			return -EINVAL;
-		}
+		param_id = (data->opcode == AFE_PORT_CMDRSP_GET_PARAM_V3) ?
+					payload[3] :
+					payload[2];
 
 		if (param_id == AFE_PARAM_ID_DEV_TIMING_STATS) {
 			av_dev_drift_afe_cb_handler(data->opcode, data->payload,
@@ -595,6 +587,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 						 data->payload_size))
 				return -EINVAL;
 		}
+
 		if (afe_token_is_valid(data->token))
 			wake_up(&this_afe.wait[data->token]);
 		else
@@ -611,17 +604,17 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 		atomic_set(&this_afe.state, 0);
 		atomic_set(&this_afe.status, 0);
 		wake_up(&this_afe.lpass_core_hw_wait);
+	} else if (data->opcode == ULTRASOUND_OPCODE) {
+		if (NULL != data->payload)
+			elliptic_process_apr_payload(data->payload);
+		else
+			pr_err("[EXPORT_SYMBOLLUS]: payload ptr is Invalid");
 	} else if (data->payload_size) {
 		uint32_t *payload;
 		uint16_t port_id = 0;
 
 		payload = data->payload;
 		if (data->opcode == APR_BASIC_RSP_RESULT) {
-			if (data->payload_size < (2 * sizeof(uint32_t))) {
-				pr_err("%s: Error: size %d is less than expected\n",
-					__func__, data->payload_size);
-				return -EINVAL;
-			}
 			pr_debug("%s:opcode = 0x%x cmd = 0x%x status = 0x%x token=%d\n",
 				__func__, data->opcode,
 				payload[0], payload[1], data->token);
@@ -993,8 +986,8 @@ static int afe_apr_send_pkt(void *data, wait_queue_head_t *wait)
 				ret = -ETIMEDOUT;
 			} else if (atomic_read(&this_afe.status) > 0) {
 				pr_err("%s: DSP returned error[%s]\n", __func__,
-					adsp_err_get_err_str(atomic_read(
-					&this_afe.status)));
+						adsp_err_get_err_str(atomic_read(
+								&this_afe.status)));
 				ret = adsp_err_get_lnx_err_code(
 						atomic_read(&this_afe.status));
 			} else {
@@ -1013,6 +1006,7 @@ static int afe_apr_send_pkt(void *data, wait_queue_head_t *wait)
 	mutex_unlock(&this_afe.afe_apr_lock);
 	return ret;
 }
+
 
 /* This function shouldn't be called directly. Instead call q6afe_set_params. */
 static int q6afe_set_params_v2(u16 port_id, int index,
@@ -1742,6 +1736,15 @@ fail_idx:
 	return ret;
 }
 
+afe_ultrasound_state_t elus_afe = {
+	.ptr_apr= &this_afe.apr,
+	.ptr_status= &this_afe.status,
+	.ptr_state= &this_afe.state,
+	.ptr_wait= this_afe.wait,
+	.timeout_ms= TIMEOUT_MS,
+};
+EXPORT_SYMBOL(elus_afe);
+
 static void afe_send_cal_spkr_prot_tx(int port_id)
 {
 	union afe_spkr_prot_config afe_spk_config;
@@ -1937,6 +1940,109 @@ done:
 	return;
 }
 
+#ifdef CONFIG_MSM_CSPL
+static int crus_cb_buffer[CRUS_BUF_SIZE];
+int crus_afe_callback(uint32_t opcode, void* payload, int size)
+{
+    uint32_t* payload32 = payload;
+
+    pr_debug("%s: module=0x%x size = %d\n", __func__,
+            (int)payload32[1], size);
+
+    if (payload32[1]!= CIRRUS_SP)
+        return -EINVAL;
+
+    if (size > CRUS_BUF_SIZE*sizeof(int)) {
+        pr_err("%s: module=0x%x, size(%d) > buf(%d), error!\n",
+                __func__,(int)payload32[1], size,
+                CRUS_BUF_SIZE*sizeof(int));
+        return -EINVAL;
+    }
+
+    memset(crus_cb_buffer, 0, CRUS_BUF_SIZE*sizeof(int));
+    if(opcode==AFE_PORT_CMDRSP_GET_PARAM_V2) {
+        memcpy(crus_cb_buffer, &payload32[4], size);
+    } else if(opcode==AFE_PORT_CMDRSP_GET_PARAM_V3) {
+        memcpy(crus_cb_buffer, &payload32[5], size);
+    } else {
+        pr_info("%s:opcode %d no surport!\n",__func__, opcode);
+        memcpy(crus_cb_buffer, &payload32[5], size);
+    }
+
+    atomic_set(&this_afe.state, 0);
+
+    return 0;
+}
+
+int crus_afe_get_params(u16 port_id, uint32_t module, uint32_t param_id,
+         void* data, int size) {
+    struct param_hdr_v3 param_hdr;
+    int ret = -EINVAL;
+
+	//mutex_lock(&this_afe.afe_cmd_lock);
+    pr_info("%s: enter ++, size=%d; module = 0x%08x, port = 0x%04x, param = 0x%08x\n",
+            __func__, size, module, port_id, param_id);
+
+    memset(&param_hdr, 0, sizeof(param_hdr));
+
+    param_hdr.module_id = module;
+    param_hdr.instance_id = INSTANCE_ID_0;
+    param_hdr.param_id = param_id;
+    param_hdr.param_size = size;
+
+    ret = q6afe_get_params(port_id, NULL, &param_hdr);
+    if (ret) {
+        pr_err("%s: Failed to get CSPL data\n", __func__);
+        goto done;
+    }
+
+    memcpy((u8 *)data, crus_cb_buffer, size);
+    ret = 0;
+done:
+	//mutex_unlock(&this_afe.afe_cmd_lock);
+    pr_info("%s: exit --\n", __func__);
+    return ret;
+}
+EXPORT_SYMBOL(crus_afe_get_params);
+int crus_afe_set_params(u16 port_id, uint32_t module_id, uint32_t param_id,
+        void* data, int size)
+{
+    int ret = 0;
+    struct param_hdr_v3 param_hdr;
+
+
+	//mutex_lock(&this_afe.afe_cmd_lock);
+    pr_info("%s: enter ++; module = 0x%08x, port = 0x%04x, param = 0x%08x\n",
+            __func__, module_id, port_id, param_id);
+
+    memset(&param_hdr, 0, sizeof(param_hdr));
+
+    /*  Set stream index */
+    param_hdr.module_id = module_id;
+    param_hdr.instance_id = INSTANCE_ID_0;
+    param_hdr.param_id = param_id;
+    param_hdr.param_size = size;
+
+    ret = q6afe_pack_and_set_param_in_band(port_id,
+            q6audio_get_port_index(port_id),
+            param_hdr, (u8 *) data);
+    if (ret) {
+        pr_err("%s: Failed to set cmd duration param, err %d\n",
+                __func__, ret);
+        goto fail_cmd;
+    }
+
+	//mutex_unlock(&this_afe.afe_cmd_lock);
+    ret = 0;
+fail_cmd:
+    pr_debug("%s: param_id =  0x%x ret = %d\n", __func__,
+            param_id, ret);
+    pr_info("%s: exit --\n", __func__);
+    return ret;
+
+}
+EXPORT_SYMBOL(crus_afe_set_params);
+#endif
 static int afe_send_hw_delay(u16 port_id, u32 rate)
 {
 	struct audio_cal_hw_delay_entry delay_entry;
@@ -4384,6 +4490,11 @@ static int __afe_port_start(u16 port_id, union afe_port_config *afe_config,
 		goto fail_cmd;
 	}
 	ret = afe_send_cmd_port_start(port_id);
+#ifdef CONFIG_MSM_CSPL
+	if (ret == 0)
+		crus_qdsp_port_start(port_id, -1);
+#endif
+
 
 fail_cmd:
 	mutex_unlock(&this_afe.afe_cmd_lock);
@@ -7087,6 +7198,10 @@ int afe_close(int port_id)
 	if (ret)
 		pr_err("%s: AFE close failed %d\n", __func__, ret);
 
+#ifdef CONFIG_MSM_CSPL
+    crus_qdsp_port_close(port_id, -1);
+#endif
+
 fail_cmd:
 	mutex_unlock(&this_afe.afe_cmd_lock);
 	return ret;
@@ -8575,6 +8690,7 @@ int __init afe_init(void)
 
 void afe_exit(void)
 {
+
 	if (this_afe.apr) {
 		apr_reset(this_afe.apr);
 		atomic_set(&this_afe.state, 0);
@@ -8737,4 +8853,3 @@ done:
 	return ret;
 }
 EXPORT_SYMBOL(afe_unvote_lpass_core_hw);
-

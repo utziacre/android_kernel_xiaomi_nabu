@@ -207,6 +207,7 @@ ifeq ($(KERNEL_BUILD), 1)
 	obj-y	+= sdm660_cdc/
 	obj-y	+= msm_sdw/
 	obj-y	+= wcd9360/
+	obj-y	+= cs35l41_v2/
 	obj-y	+= wcd937x/
 endif
 
