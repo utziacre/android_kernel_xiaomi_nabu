@@ -20,7 +20,6 @@
 #include <linux/of_gpio.h>
 #include <linux/pwm.h>
 #include <video/mipi_display.h>
-#include <asm/hwconf_manager.h>
 
 #include "dsi_panel.h"
 #include "dsi_display.h"
@@ -31,7 +30,7 @@
 #include <asm/uaccess.h>
 #include <asm/fcntl.h>
 
-#include <drm/drm_notifier.h>
+#include <linux/msm_drm_notify.h>
 
 #include "../../../../../kernel/irq/internals.h"
 
@@ -769,7 +768,7 @@ int dsi_panel_set_doze_backlight(struct dsi_display *display)
 		goto error;
 	}
 
-	if (drm_dev && (drm_dev->doze_state == DRM_BLANK_LP1 || drm_dev->doze_state == DRM_BLANK_LP2)) {
+	if (drm_dev && (drm_dev->doze_state == MSM_DRM_BLANK_LP1 || drm_dev->doze_state == MSM_DRM_BLANK_LP2)) {
 		if (panel->fod_hbm_enabled || panel->fod_dimlayer_hbm_enabled || panel->fod_backlight_flag) {
 			pr_info("%s FOD HBM open, skip set doze backlight at: [hbm=%d][dimlayer_fod=%d][fod_bl=%d]\n", __func__,
 			panel->fod_hbm_enabled, panel->fod_dimlayer_hbm_enabled, panel->fod_backlight_flag);
@@ -3948,17 +3947,6 @@ static int dsi_panel_parse_mi_config(struct dsi_panel *panel,
 	panel->panel_dead_flag = false;
 	panel->tddi_doubleclick_flag = false;
 
-	register_hw_monitor_info(HWMON_CONPONENT_NAME);
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_ACTIVE, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_REFRESH, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_BOOTTIME, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_DAYS, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_BL_AVG, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_BL_HIGH, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_BL_LOW, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_HBM_DRUATION, "0");
-	add_hw_monitor_info(HWMON_CONPONENT_NAME, HWMON_KEY_HBM_TIMES, "0");
-
 	return rc;
 }
 
@@ -3993,10 +3981,6 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 
 	panel_model = utils->get_property(utils->data,
 				"qcom,mdss-dsi-panel-model", NULL);
-	if (panel_model) {
-		register_hw_component_info(HWCONPONENT_NAME);
-		add_hw_component_info(HWCONPONENT_NAME, HWCONPONENT_KEY_LCD, (char *)panel_model);
-	}
 
 	dispparam_enabled = utils->read_bool(utils->data,
 				"qcom,dispparam-enabled" );
@@ -5199,8 +5183,8 @@ static int panel_disp_param_send_lock(struct dsi_panel *panel, int param)
 			if (host)
 				display = container_of(host, struct dsi_display, host);
 
-			if ((display->drm_dev && display->drm_dev->doze_state == DRM_BLANK_LP1) ||
-				(display->drm_dev && display->drm_dev->doze_state == DRM_BLANK_LP2)) {
+			if ((display->drm_dev && display->drm_dev->doze_state == MSM_DRM_BLANK_LP1) ||
+				(display->drm_dev && display->drm_dev->doze_state == MSM_DRM_BLANK_LP2)) {
 #if 0
 				if (panel->last_bl_lvl > panel->doze_backlight_threshold) {
 					pr_info("hbm fod off DSI_CMD_SET_DOZE_HBM");
@@ -5357,8 +5341,8 @@ static int panel_disp_param_send_lock(struct dsi_panel *panel, int param)
 				panel->last_bl_lvl, display->drm_dev->doze_state);
 				rc = dsi_panel_update_backlight(panel, panel->last_bl_lvl);
 			}
-			if ((display->drm_dev && display->drm_dev->doze_state == DRM_BLANK_LP1) ||
-				(display->drm_dev && display->drm_dev->doze_state == DRM_BLANK_LP2)) {
+			if ((display->drm_dev && display->drm_dev->doze_state == MSM_DRM_BLANK_LP1) ||
+				(display->drm_dev && display->drm_dev->doze_state == MSM_DRM_BLANK_LP2)) {
 #if 0
 				if (panel->last_bl_lvl > panel->doze_backlight_threshold) {
 					pr_info("FOD backlight restore DSI_CMD_SET_DOZE_HBM");

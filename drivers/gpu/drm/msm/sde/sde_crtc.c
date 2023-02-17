@@ -26,7 +26,7 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_flip_work.h>
-#include <drm/drm_notifier.h>
+#include <linux/msm_drm_notify.h>
 #include <linux/clk/qcom.h>
 #include <linux/sde_rsc.h>
 
@@ -3158,7 +3158,7 @@ void sde_crtc_fod_ui_ready(struct drm_crtc *crtc,
 	struct sde_crtc *sde_crtc;
 	struct sde_crtc_state *old_cstate;
 	struct sde_crtc_state *cstate;
-	struct drm_notify_data notify_data;
+	struct msm_drm_notifier notify_data;
 	struct dsi_display *dsi_display = get_primary_display();
 	int finger_down;
 	static bool fod_status_changed;
@@ -3200,7 +3200,7 @@ void sde_crtc_fod_ui_ready(struct drm_crtc *crtc,
 		SDE_ATRACE_END("fod_event_notify");
 #if 0
 		SDE_ATRACE_BEGIN("fod_event_notify");
-		drm_notifier_call_chain(DRM_FOD_EVENT,
+		msm_drm_notifier_call_chain(DRM_FOD_EVENT,
 				&notify_data);
 		SDE_ATRACE_END("fod_event_notify");
 #endif
