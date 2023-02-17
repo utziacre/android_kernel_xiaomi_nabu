@@ -26,7 +26,7 @@
 #include "sde_crtc.h"
 #include "sde_rm.h"
 #include "sde_trace.h"
-#include <drm/drm_notifier.h>
+#include <linux/msm_drm_notify.h>
 
 #define BL_NODE_NAME_SIZE 32
 
@@ -736,8 +736,8 @@ int sde_connector_update_hbm(struct sde_connector *c_conn)
 			mutex_lock(&dsi_display->panel->panel_lock);
 			sde_encoder_wait_for_event(c_conn->encoder, MSM_ENC_VBLANK);
 			if (dsi_display->panel->elvss_dimming_check_enable &&
-				((dsi_display->drm_dev && dsi_display->drm_dev->doze_state == DRM_BLANK_LP1) ||
-				(dsi_display->drm_dev && dsi_display->drm_dev->doze_state == DRM_BLANK_LP2))) {
+				((dsi_display->drm_dev && dsi_display->drm_dev->doze_state == MSM_DRM_BLANK_LP1) ||
+				(dsi_display->drm_dev && dsi_display->drm_dev->doze_state == MSM_DRM_BLANK_LP2))) {
 				if (dsi_display->drm_dev->doze_brightness == DOZE_BRIGHTNESS_HBM) {
 					pr_info("hbm fod off doze hbm on\n");
 					dsi_display_write_panel(dsi_display, &dsi_display->panel->hbm_fod_off_doze_hbm_on);
