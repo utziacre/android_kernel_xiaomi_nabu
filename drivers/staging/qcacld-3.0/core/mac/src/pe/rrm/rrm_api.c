@@ -302,7 +302,7 @@ rrm_process_link_measurement_request(tpAniSirGlobal pMac,
 	LinkReport.txAntenna = 0;
 	currentRSSI = WMA_GET_RX_RSSI_RAW(pRxPacketInfo);
 
-	pe_info("Received Link report frame with %d", currentRSSI);
+	pe_debug("Received Link report frame with %d", currentRSSI);
 
 	rrm_calculate_and_fill_rcpi(&LinkReport.rcpi, currentRSSI);
 	LinkReport.rsni = WMA_GET_RX_SNR(pRxPacketInfo);

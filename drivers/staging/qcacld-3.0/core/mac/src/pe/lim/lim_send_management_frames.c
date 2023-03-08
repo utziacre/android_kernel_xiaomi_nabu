@@ -4500,7 +4500,7 @@ lim_send_link_report_action_frame(tpAniSirGlobal pMac,
 			nStatus);
 	}
 
-	pe_warn("Sending a Link Report to");
+	pe_debug("Sending a Link Report to");
 	lim_print_mac_addr(pMac, peer, LOGW);
 
 	if ((BAND_5G == lim_get_rf_band(psessionEntry->currentOperChannel))
