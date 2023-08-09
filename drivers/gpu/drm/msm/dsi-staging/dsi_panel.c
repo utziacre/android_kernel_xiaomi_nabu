@@ -1038,6 +1038,15 @@ error:
 	return rc;
 }
 
+static bool in_droidsystem;
+
+static int __init boot_mode_setup(char *value)
+{
+	in_droidsystem = !strcmp(value, "1");
+	return 1;
+}
+__setup("androidboot.force_normal_boot=", boot_mode_setup);
+
 static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 				  struct dsi_parser_utils *utils)
 {
@@ -1078,6 +1087,9 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 	rc = utils->read_u32(utils->data,
 				"qcom,mdss-dsi-panel-framerate",
 				&mode->refresh_rate);
+        if(!in_droidsystem)
+		mode->refresh_rate = 104;
+
 	if (rc) {
 		pr_err("failed to read qcom,mdss-dsi-panel-framerate, rc=%d\n",
 		       rc);
@@ -1629,6 +1641,12 @@ static int dsi_panel_parse_dfps_caps(struct dsi_panel *panel)
 	const char *name = panel->name;
 	const char *type;
 	u32 i;
+
+        if(!in_droidsystem){
+		dfps_caps->dfps_support = false;
+		return rc;
+	}
+
 
 	supported = utils->read_bool(utils->data,
 			"qcom,mdss-dsi-pan-enable-dynamic-fps");
