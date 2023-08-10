@@ -684,6 +684,7 @@ static int prefer_high_cap_write(struct cgroup_subsys_state *css,
 }
 
 #ifdef CONFIG_STUNE_ASSIST
+#ifdef CONFIG_SCHED_WALT
 static int sched_boost_override_write_wrapper(struct cgroup_subsys_state *css,
 					      struct cftype *cft, u64 override)
 {
@@ -693,7 +694,6 @@ static int sched_boost_override_write_wrapper(struct cgroup_subsys_state *css,
 	return sched_boost_override_write(css, cft, override);
 }
 
-#ifdef CONFIG_SCHED_WALT
 static int sched_colocate_write_wrapper(struct cgroup_subsys_state *css,
 					struct cftype *cft, u64 colocate)
 {
@@ -779,6 +779,7 @@ struct st_data {
 	char *name;
 	int boost;
 	bool prefer_idle;
+	bool prefer_high_cap;
 	bool colocate;
 	bool no_override;
 };
@@ -786,11 +787,11 @@ struct st_data {
 static void write_default_values(struct cgroup_subsys_state *css)
 {
 	static struct st_data st_targets[] = {
-		{ "audio-app",	0, 0, 0, 0 },
-		{ "background",	0, 0, 0, 0 },
-		{ "foreground",	0, 1, 0, 0 },
-		{ "rt",		0, 0, 0, 0 },
-		{ "top-app",	1, 1, 0, 0 },
+		{ "audio-app",	0, 0, 0, 0, 0 },
+		{ "background",	0, 0, 0, 0, 0 },
+		{ "foreground",	0, 1, 0, 0, 0 },
+		{ "rt",		0, 0, 0, 0, 0 },
+		{ "top-app",	1, 1, 1, 0, 0 },
 	};
 	int i;
 
@@ -800,14 +801,15 @@ static void write_default_values(struct cgroup_subsys_state *css)
 		if (!strcmp(css->cgroup->kn->name, tgt.name)) {
 			boost_write(css, NULL, tgt.boost);
 			prefer_idle_write(css, NULL, tgt.prefer_idle);
-			sched_boost_override_write(css, NULL, tgt.no_override);
-#ifndef CONFIG_SCHED_WALT
-			pr_info("stune_assist: setting values for %s: boost=%d prefer_idle=%d no_override=%d\n",
-				tgt.name, tgt.boost, tgt.prefer_idle, tgt.no_override);
-#else
-			sched_colocate_write(css, NULL, tgt.colocate);
-			pr_info("stune_assist: setting values for %s: boost=%d prefer_idle=%d colocate=%d no_override=%d\n",
+#ifdef CONFIG_SCHED_WALT
+                        sched_boost_override_write(css, NULL, tgt.no_override);
+                        sched_colocate_write(css, NULL, tgt.colocate);
+			pr_info("stune_assist: setting values for %s: boost=%d prefer_idle=%d override=%d no_override=%d\n",
 				tgt.name, tgt.boost, tgt.prefer_idle, tgt.colocate, tgt.no_override);
+#else
+			prefer_high_cap_write(css, NULL, tgt.prefer_high_cap);
+			pr_info("stune_assist: setting values for %s: boost=%d prefer_idle=%d prefer_high_cap=%d\n",
+				tgt.name, tgt.boost, tgt.prefer_idle, tgt.prefer_high_cap);
 #endif
 		}
 	}
