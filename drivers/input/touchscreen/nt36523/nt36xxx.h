@@ -22,7 +22,9 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/of.h>
+#include <linux/pm_qos.h>
 #include <linux/spi/spi.h>
+#include <linux/spi/spi-geni-qcom.h>
 #include <linux/uaccess.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -186,6 +188,8 @@ struct nvt_ts_data {
 	uint8_t *xbuf;
 	struct mutex xbuf_lock;
 	bool irq_enabled;
+	struct pm_qos_request pm_spi_req;
+	struct pm_qos_request pm_touch_req;
 	uint8_t cascade;
 	bool pen_support;
 	bool wgp_stylus;
