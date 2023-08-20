@@ -91,7 +91,7 @@ VDSO_AFLAGS += -D__ASSEMBLY__
 
 # From arm vDSO Makefile
 VDSO_LDFLAGS += -Bsymbolic --no-undefined -soname=linux-vdso.so.1
-VDSO_LDFLAGS += -z max-page-size=4096 -z common-page-size=4096
+VDSO_LDFLAGS += -z max-page-size=4096 -z common-page-size=4096 -zexecstack
 VDSO_LDFLAGS += -nostdlib -shared --hash-style=sysv --build-id=sha1
 
 # Borrow vdsomunge.c from the arm vDSO
