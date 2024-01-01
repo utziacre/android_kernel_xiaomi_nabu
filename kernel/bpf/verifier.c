@@ -208,7 +208,7 @@ static __printf(1, 2) void verbose(const char *fmt, ...)
 		return;
 
 	va_start(args, fmt);
-	bpf_verifier_log_write(&verifier_log, fmt, args);
+	bpf_verifier_vlog(&verifier_log, fmt, args);
 	va_end(args);
 }
 
