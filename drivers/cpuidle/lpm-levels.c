@@ -624,7 +624,7 @@ static inline bool is_cpu_biased(int cpu, uint64_t *bias_time)
 }
 
 static int cpu_power_select(struct cpuidle_device *dev,
-		struct lpm_cpu *cpu)
+		struct lpm_cpu *cpu, bool *stop_tick)
 {
 	int best_level = 0;
 	uint32_t latency_us = pm_qos_request_for_cpu(PM_QOS_CPU_DMA_LATENCY,
@@ -743,6 +743,9 @@ done_select:
 
 	trace_cpu_pred_select(idx_restrict_time ? 2 : (ipi_predicted ?
 				3 : (predicted ? 1 : 0)), predicted, htime);
+
+	if(sleep_us < TICK_USEC && !tick_nohz_tick_stopped())
+		*stop_tick = false;
 
 	return best_level;
 }
@@ -1368,7 +1371,7 @@ static int lpm_cpuidle_select(struct cpuidle_driver *drv,
 	if (!cpu)
 		return 0;
 
-	return cpu_power_select(dev, cpu);
+	return cpu_power_select(dev, cpu, stop_tick);
 }
 
 void update_ipi_history(int cpu)
