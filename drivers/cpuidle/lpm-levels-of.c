@@ -398,6 +398,8 @@ static int parse_power_params(struct device_node *node,
 	if (ret)
 		goto fail;
 
+	pwr->exit_latency = pwr->exit_latency + pwr->entry_latency;
+
 	key = "qcom,min-residency-us";
 	ret = of_property_read_u32(node, key, &pwr->min_residency);
 	if (ret)
