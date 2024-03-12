@@ -33,6 +33,9 @@
 #include <linux/highmem.h>
 #include "binder_alloc.h"
 #include "binder_trace.h"
+#if IS_ENABLED(CONFIG_MILLET)
+#include <linux/millet.h>
+#endif
 
 struct list_lru binder_alloc_lru;
 
@@ -388,6 +391,11 @@ static int start_rekernel_server(void) {
   }
   return 0;
 }
+
+#if IS_ENABLED(CONFIG_MILLET)
+extern struct task_struct *binder_buff_owner(struct binder_alloc *alloc);
+#endif
+
 struct binder_buffer *binder_alloc_new_buf_locked(
 				struct binder_alloc *alloc,
 				size_t data_size,
@@ -448,6 +456,27 @@ struct binder_buffer *binder_alloc_new_buf_locked(
 			      alloc->pid, size);
 		return ERR_PTR(-ENOSPC);
 	}
+
+#if IS_ENABLED(CONFIG_MILLET)
+	if (is_async
+		&& (alloc->free_async_space
+			< WARN_AHEAD_MSGS * (size + sizeof(struct binder_buffer))
+			|| alloc->free_async_space < binder_warn_ahead_space)) {
+			struct millet_data data;
+			struct task_struct *owner;
+
+			owner = binder_buff_owner(alloc);
+			if (owner) {
+				memset(&data, 0, sizeof(struct millet_data));
+				data.pri[0] =  BINDER_BUFF_WARN;
+				data.mod.k_priv.binder.trans.dst_task = owner;
+				data.mod.k_priv.binder.trans.src_task = current;
+				millet_sendmsg(BINDER_TYPE, owner, &data);
+			}
+	}
+	if (false)
+		binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC, "%s", NAME_ARRAY[0]);
+#endif
 
 	/* Pad 0-size buffers so they get assigned unique addresses */
 	size = max(size, sizeof(void *));
