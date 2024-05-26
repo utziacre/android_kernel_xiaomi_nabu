@@ -232,10 +232,6 @@ static void balance_irqs(void)
 		bd = per_cpu_ptr(&balance_data, cpu);
 		bd->intrs += bi->delta_nr;
 
-		/* Don't balance performance critical irqs */
-		if (irqd_has_set(&bi->desc->irq_data, IRQD_PERF_CRITICAL))
-                        continue;
-
 		/* Consider this IRQ for balancing if it's movable */
 		if (!__irq_can_set_affinity(bi->desc))
 			continue;
